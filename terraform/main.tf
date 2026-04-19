@@ -24,7 +24,6 @@ module "eks" {
     default = {
       instance_types = ["t3.small"]
       desired_size   = 2
-      ami_type       = "AL2023_x86_64" 
     }
   }
 }
