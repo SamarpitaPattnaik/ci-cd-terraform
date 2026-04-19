@@ -6,6 +6,14 @@ pipeline {
         TF_IN_AUTOMATION = 'true'
     }
 
+    parameters {
+        booleanParam(
+            name: 'DESTROY',
+            defaultValue: false,
+            description: 'Destroy infrastructure instead of creating'
+        )
+    }
+
     stages {
 
         stage('Clone Repo') {
@@ -25,7 +33,11 @@ pipeline {
             }
         }
 
+        // 🔥 APPLY ONLY IF NOT DESTROY
         stage('Terraform Apply') {
+            when {
+                expression { return params.DESTROY == false }
+            }
             steps {
                 dir('terraform') {
                     sh 'terraform apply -auto-approve'
@@ -33,7 +45,11 @@ pipeline {
             }
         }
 
+        // 🔥 UPDATE KUBECONFIG ONLY IF APPLY
         stage('Update kubeconfig') {
+            when {
+                expression { return params.DESTROY == false }
+            }
             steps {
                 script {
                     env.CLUSTER_NAME = sh(
@@ -50,7 +66,11 @@ pipeline {
             }
         }
 
+        // 🔥 DEPLOY ONLY IF APPLY
         stage('Deploy to EKS') {
+            when {
+                expression { return params.DESTROY == false }
+            }
             steps {
                 sh '''
                 kubectl apply -f k8s/deployment.yaml
@@ -59,7 +79,7 @@ pipeline {
             }
         }
 
-    
+        // 🔥 DESTROY ONLY IF SELECTED
         stage('Terraform Destroy') {
             when {
                 expression { return params.DESTROY == true }
@@ -72,20 +92,12 @@ pipeline {
         }
     }
 
-    parameters {
-        booleanParam(
-            name: 'DESTROY',
-            defaultValue: false,
-            description: 'Check to destroy infrastructure'
-        )
-    }
-
     post {
         success {
-            echo 'Pipeline executed successfully'
+            echo '✅ Pipeline executed successfully'
         }
         failure {
-            echo 'Pipeline failed'
+            echo '❌ Pipeline failed'
         }
     }
 }
