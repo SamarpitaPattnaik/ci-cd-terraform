@@ -5,7 +5,7 @@ provider "aws" {
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
   cluster_name    = "terraform-eks-cluster"
-  cluster_version = "1.35"
+  cluster_version = "1.29"
 
   subnet_ids = ["subnet-00f21c8a15164983f", "subnet-037b475270b0e713e","subnet-0ebe331755e4e9e38"]
   vpc_id     = "vpc-0027db6152b73fc0d"
