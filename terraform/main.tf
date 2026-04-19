@@ -6,7 +6,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
   cluster_name    = "terraform-eks-cluster"
-  cluster_version = "1.29"
+  cluster_version = "1.35"
 
   subnet_ids = [
     "subnet-00f21c8a15164983f",
@@ -20,6 +20,7 @@ module "eks" {
     default = {
       instance_types = ["t3.small"]
       desired_size   = 2
+      ami_type       = "AL2_x86_64"
     }
   }
 }
