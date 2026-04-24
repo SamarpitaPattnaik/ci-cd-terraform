@@ -42,37 +42,40 @@ pipeline {
             }
         }
 
-       /* stage('Import Existing Resources') {
-            when {
-                expression { return params.DESTROY == false || params.DESTROY == 'false' }
-            }
-             steps {
+      stage('Import Existing Resources') {
+    when {
+        expression { return params.DESTROY == false || params.DESTROY == 'false' }
+    }
+    steps {
         dir('terraform') {
             sh '''
             echo "Checking if EKS access entry exists in AWS..."
+
             if aws eks describe-access-entry \
                 --cluster-name terraform-eks-cluster \
                 --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
                 --region ap-south-1 > /dev/null 2>&1; then
 
                 STATE_CHECK=$(terraform state list 2>/dev/null | grep "aws_eks_access_entry.jenkins" || true)
+
                 if [ -z "$STATE_CHECK" ]; then
                     echo "Importing EKS access entry..."
+
                     terraform import \
                       aws_eks_access_entry.jenkins \
-                      "terraform-eks-cluster:arn:aws:iam::333982363626:role/jenkins-eks-role" || true
+                      "terraform-eks-cluster,arn:aws:iam::333982363626:role/jenkins-eks-role" || true
+
                 else
-                    echo "Already in state - skipping"
+                    echo "Already in state - skipping import"
                 fi
+
             else
-                # Resource does not exist in AWS - skip import, apply will create it
-                echo "Access entry does not exist in AWS - will be created by terraform apply"
+                echo "Access entry does not exist - will be created"
             fi
             '''
         }
     }
-}*/
-
+}
         stage('Terraform Apply') {
             when {
                 expression { return params.DESTROY == false || params.DESTROY == 'false' }
