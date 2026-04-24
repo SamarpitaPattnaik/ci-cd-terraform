@@ -35,10 +35,6 @@ pipeline {
         }
 
         stage('Terraform Apply') {
-            when {
-        // ✅ Handle both boolean and string comparison
-        expression { return params.DESTROY == false || params.DESTROY == 'false' }
-            }
             steps {
                 dir('terraform') {
                     sh '''
