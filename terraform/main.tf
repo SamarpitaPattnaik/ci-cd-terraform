@@ -3,15 +3,13 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = "terraform-eks-cluster"
-  cluster_version = "1.29"
+  cluster_version = "1.30"
 
   create_kms_key            = false
   cluster_encryption_config = {}
   create_cloudwatch_log_group = false
 
-  # ✅ This handles creator access automatically - no manual access_entries needed
-  enable_cluster_creator_admin_permissions = true
-  cluster_endpoint_public_access           = true
+  cluster_endpoint_public_access = true
 
   vpc_id = "vpc-0027db6152b73fc0d"
   subnet_ids = [
