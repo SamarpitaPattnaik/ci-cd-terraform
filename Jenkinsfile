@@ -42,7 +42,7 @@ pipeline {
             }
         }
 
-        stage('Import Existing Resources') {
+       /* stage('Import Existing Resources') {
             when {
                 expression { return params.DESTROY == false || params.DESTROY == 'false' }
             }
@@ -71,7 +71,7 @@ pipeline {
             '''
         }
     }
-}
+}*/
 
         stage('Terraform Apply') {
             when {
