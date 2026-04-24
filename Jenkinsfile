@@ -3,14 +3,10 @@ pipeline {
     environment {
         AWS_REGION = 'ap-south-1'
         TF_IN_AUTOMATION = 'true'
+        // ✅ Fixed path on Jenkins server to persist state
+        STATE_FILE = '/var/jenkins_home/terraform-states/eks/terraform.tfstate'
     }
-    parameters {
-        booleanParam(
-            name: 'DESTROY',
-            defaultValue: false,
-            description: 'Destroy infrastructure instead of creating'
-        )
-    }
+
     stages {
         stage('Clone Repo') {
             steps {
@@ -22,7 +18,16 @@ pipeline {
             steps {
                 dir('terraform') {
                     sh '''
-                    rm -rf .terraform .terraform.lock.hcl terraform.tfstate*
+                    # ✅ Restore state from Jenkins home if exists
+                    mkdir -p /var/jenkins_home/terraform-states/eks
+                    if [ -f "$STATE_FILE" ]; then
+                        echo "✅ Restoring existing state file..."
+                        cp $STATE_FILE terraform.tfstate
+                    else
+                        echo "⚠️ No existing state found, fresh start"
+                    fi
+
+                    rm -rf .terraform .terraform.lock.hcl
                     terraform init -upgrade
                     '''
                 }
@@ -35,7 +40,13 @@ pipeline {
             }
             steps {
                 dir('terraform') {
-                    sh 'terraform apply -auto-approve'
+                    sh '''
+                    terraform apply -auto-approve
+
+                    # ✅ Save state back to Jenkins home after apply
+                    cp terraform.tfstate $STATE_FILE
+                    echo "✅ State saved successfully"
+                    '''
                 }
             }
         }
@@ -52,13 +63,11 @@ pipeline {
                     ).trim()
                 }
                 sh '''
-                # ✅ Fixed: Added --role-arn so Jenkins assumes the correct IAM role
                 aws eks update-kubeconfig \
                   --region $AWS_REGION \
                   --name $CLUSTER_NAME \
                   --role-arn arn:aws:iam::333982363626:role/jenkins-eks-role
 
-                # ✅ Added: Verify connection works before deploying
                 kubectl get nodes
                 '''
             }
@@ -72,8 +81,6 @@ pipeline {
                 sh '''
                 kubectl apply -f k8s/deployment.yaml
                 kubectl apply -f k8s/service.yaml
-
-                # ✅ Added: Verify deployment rollout
                 kubectl rollout status deployment -n default
                 '''
             }
@@ -85,7 +92,17 @@ pipeline {
             }
             steps {
                 dir('terraform') {
-                    sh 'terraform destroy -auto-approve'
+                    sh '''
+                    # ✅ Restore state before destroy
+                    if [ -f "$STATE_FILE" ]; then
+                        cp $STATE_FILE terraform.tfstate
+                    fi
+
+                    terraform destroy -auto-approve
+
+                    # ✅ Clean up state after destroy
+                    rm -f $STATE_FILE
+                    '''
                 }
             }
         }
@@ -96,7 +113,7 @@ pipeline {
             echo '✅ Pipeline executed successfully'
         }
         failure {
-            echo '❌ Pipeline failed - Check AWS credentials and IAM role permissions'
+            echo '❌ Pipeline failed'
         }
     }
 }
