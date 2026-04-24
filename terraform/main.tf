@@ -9,6 +9,8 @@ module "eks" {
   cluster_encryption_config = {}
   create_cloudwatch_log_group = false
 
+  cluster_endpoint_public_access  = true
+  cluster_endpoint_private_access = true
   cluster_endpoint_public_access = true
 
   vpc_id = "vpc-0027db6152b73fc0d"
