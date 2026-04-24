@@ -42,37 +42,33 @@ pipeline {
             }
         }
 
-        // ✅ NEW STAGE: Auto-import existing resources before apply
         stage('Import Existing Resources') {
-    when {
-        expression { return params.DESTROY == false || params.DESTROY == 'false' }
-    }
-    stage('Import Existing Resources') {
-    when {
-        expression { return params.DESTROY == false || params.DESTROY == 'false' }
-    }
-    steps {
-        dir('terraform') {
-            sh '''
-            # ✅ Import using the new separate resource address
-            if aws eks describe-access-entry \
-                --cluster-name terraform-eks-cluster \
-                --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
-                --region ap-south-1 > /dev/null 2>&1; then
+            when {
+                expression { return params.DESTROY == false || params.DESTROY == 'false' }
+            }
+            steps {
+                dir('terraform') {
+                    sh '''
+                    if aws eks describe-access-entry \
+                        --cluster-name terraform-eks-cluster \
+                        --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
+                        --region ap-south-1 > /dev/null 2>&1; then
 
-                if ! terraform state list | grep -q "aws_eks_access_entry.jenkins"; then
-                    echo "Importing EKS access entry..."
-                    terraform import \
-                      aws_eks_access_entry.jenkins \
-                      "terraform-eks-cluster:arn:aws:iam::333982363626:role/jenkins-eks-role" || true
-                else
-                    echo "✅ Access entry already in state"
-                fi
-            fi
-            '''
+                        if ! terraform state list | grep -q "aws_eks_access_entry.jenkins"; then
+                            echo "Importing EKS access entry..."
+                            terraform import \
+                              aws_eks_access_entry.jenkins \
+                              "terraform-eks-cluster:arn:aws:iam::333982363626:role/jenkins-eks-role" || true
+                        else
+                            echo "✅ Access entry already in state"
+                        fi
+                    else
+                        echo "✅ No existing access entry found"
+                    fi
+                    '''
+                }
+            }
         }
-    }
-}
 
         stage('Terraform Apply') {
             when {
