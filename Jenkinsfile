@@ -47,44 +47,27 @@ pipeline {
     when {
         expression { return params.DESTROY == false || params.DESTROY == 'false' }
     }
+    stage('Import Existing Resources') {
+    when {
+        expression { return params.DESTROY == false || params.DESTROY == 'false' }
+    }
     steps {
         dir('terraform') {
             sh '''
-            # Check and import EKS Access Entry
+            # ✅ Import using the new separate resource address
             if aws eks describe-access-entry \
                 --cluster-name terraform-eks-cluster \
                 --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
                 --region ap-south-1 > /dev/null 2>&1; then
 
-                # ✅ Fixed: Use simple grep without backslash
-                if ! terraform state list | grep -q "jenkins"; then
+                if ! terraform state list | grep -q "aws_eks_access_entry.jenkins"; then
                     echo "Importing EKS access entry..."
                     terraform import \
-                      "module.eks.aws_eks_access_entry.this[\\"jenkins\\"]" \
+                      aws_eks_access_entry.jenkins \
                       "terraform-eks-cluster:arn:aws:iam::333982363626:role/jenkins-eks-role" || true
                 else
                     echo "✅ Access entry already in state"
                 fi
-            else
-                echo "✅ No existing access entry found"
-            fi
-
-            # Check and import KMS Alias
-            if aws kms describe-key \
-                --key-id alias/eks/terraform-eks-cluster \
-                --region ap-south-1 > /dev/null 2>&1; then
-
-                # ✅ Fixed: Use simple grep without backslash
-                if ! terraform state list | grep -q "kms_alias"; then
-                    echo "Importing KMS alias..."
-                    terraform import \
-                      "module.eks.module.kms.aws_kms_alias.this[\\"cluster\\"]" \
-                      "arn:aws:kms:ap-south-1:333982363626:alias/eks/terraform-eks-cluster" || true
-                else
-                    echo "✅ KMS alias already in state"
-                fi
-            else
-                echo "✅ No existing KMS alias found"
             fi
             '''
         }
