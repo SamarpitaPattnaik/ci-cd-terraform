@@ -46,29 +46,32 @@ pipeline {
             when {
                 expression { return params.DESTROY == false || params.DESTROY == 'false' }
             }
-            steps {
-                dir('terraform') {
-                    sh '''
-                    if aws eks describe-access-entry \
-                        --cluster-name terraform-eks-cluster \
-                        --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
-                        --region ap-south-1 > /dev/null 2>&1; then
+             steps {
+        dir('terraform') {
+            sh '''
+            echo "Checking if EKS access entry exists in AWS..."
+            if aws eks describe-access-entry \
+                --cluster-name terraform-eks-cluster \
+                --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
+                --region ap-south-1 > /dev/null 2>&1; then
 
-                        if ! terraform state list | grep -q "aws_eks_access_entry.jenkins"; then
-                            echo "Importing EKS access entry..."
-                            terraform import \
-                              aws_eks_access_entry.jenkins \
-                              "terraform-eks-cluster:arn:aws:iam::333982363626:role/jenkins-eks-role" || true
-                        else
-                            echo "✅ Access entry already in state"
-                        fi
-                    else
-                        echo "✅ No existing access entry found"
-                    fi
-                    '''
-                }
-            }
+                STATE_CHECK=$(terraform state list 2>/dev/null | grep "aws_eks_access_entry.jenkins" || true)
+                if [ -z "$STATE_CHECK" ]; then
+                    echo "Importing EKS access entry..."
+                    terraform import \
+                      aws_eks_access_entry.jenkins \
+                      "terraform-eks-cluster:arn:aws:iam::333982363626:role/jenkins-eks-role" || true
+                else
+                    echo "Already in state - skipping"
+                fi
+            else
+                # Resource does not exist in AWS - skip import, apply will create it
+                echo "Access entry does not exist in AWS - will be created by terraform apply"
+            fi
+            '''
         }
+    }
+}
 
         stage('Terraform Apply') {
             when {
