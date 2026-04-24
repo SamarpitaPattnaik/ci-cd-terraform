@@ -5,6 +5,10 @@ module "eks" {
   cluster_name    = "terraform-eks-cluster"
   cluster_version = "1.30"  # ⚠️ Changed: 1.35 doesn't exist yet, use 1.29 or 1.30
 
+  # ✅ Disable KMS to avoid plugin crash
+  create_kms_key            = false
+  cluster_encryption_config = {}
+
   create_cloudwatch_log_group = false
 
   vpc_id = "vpc-0027db6152b73fc0d"
