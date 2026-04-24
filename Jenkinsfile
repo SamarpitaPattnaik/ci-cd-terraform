@@ -30,10 +30,10 @@ pipeline {
                     sh '''
                     mkdir -p /var/lib/jenkins/terraform-states/eks
                     if [ -f "$STATE_FILE" ]; then
-                        echo "✅ Restoring existing state file..."
+                        echo "Restoring existing state file..."
                         cp $STATE_FILE terraform.tfstate
                     else
-                        echo "⚠️ No existing state found, fresh start"
+                        echo "No existing state found, fresh start"
                     fi
                     rm -rf .terraform .terraform.lock.hcl
                     terraform init -upgrade
@@ -42,40 +42,51 @@ pipeline {
             }
         }
 
-      stage('Import Existing Resources') {
-    when {
-        expression { return params.DESTROY == false || params.DESTROY == 'false' }
-    }
-    steps {
-        dir('terraform') {
-            sh '''
-            echo "Checking if EKS access entry exists in AWS..."
+        stage('Import Existing Resources') {
+            when {
+                expression { return params.DESTROY == false || params.DESTROY == 'false' }
+            }
+            steps {
+                dir('terraform') {
+                    sh '''
+                    echo "Checking if EKS cluster exists in AWS..."
 
-            if aws eks describe-access-entry \
-                --cluster-name terraform-eks-cluster \
-                --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
-                --region ap-south-1 > /dev/null 2>&1; then
+                    # Check if cluster exists first
+                    if ! aws eks describe-cluster \
+                        --name terraform-eks-cluster \
+                        --region ap-south-1 > /dev/null 2>&1; then
+                        echo "Cluster does not exist yet - skipping import"
+                        exit 0
+                    fi
 
-                STATE_CHECK=$(terraform state list 2>/dev/null | grep "aws_eks_access_entry.jenkins" || true)
+                    echo "Cluster exists - checking access entry..."
 
-                if [ -z "$STATE_CHECK" ]; then
-                    echo "Importing EKS access entry..."
+                    # Check if access entry exists in AWS
+                    if aws eks describe-access-entry \
+                        --cluster-name terraform-eks-cluster \
+                        --principal-arn arn:aws:iam::333982363626:role/jenkins-eks-role \
+                        --region ap-south-1 > /dev/null 2>&1; then
 
-                    terraform import \
-                      aws_eks_access_entry.jenkins \
-                      "terraform-eks-cluster,arn:aws:iam::333982363626:role/jenkins-eks-role" || true
+                        # Check if already in terraform state
+                        STATE_CHECK=$(terraform state list 2>/dev/null | grep "aws_eks_access_entry.jenkins" || true)
 
-                else
-                    echo "Already in state - skipping import"
-                fi
-
-            else
-                echo "Access entry does not exist - will be created"
-            fi
-            '''
+                        if [ -z "$STATE_CHECK" ]; then
+                            echo "Access entry exists in AWS but not in state - importing..."
+                            terraform import \
+                              aws_eks_access_entry.jenkins \
+                              "terraform-eks-cluster:arn:aws:iam::333982363626:role/jenkins-eks-role" || true
+                            echo "Import done"
+                        else
+                            echo "Access entry already in state - skipping import"
+                        fi
+                    else
+                        echo "Access entry does not exist in AWS - will be created by apply"
+                    fi
+                    '''
+                }
+            }
         }
-    }
-}
+
         stage('Terraform Apply') {
             when {
                 expression { return params.DESTROY == false || params.DESTROY == 'false' }
@@ -85,7 +96,7 @@ pipeline {
                     sh '''
                     terraform apply -auto-approve
                     cp terraform.tfstate $STATE_FILE
-                    echo "✅ State saved successfully"
+                    echo "State saved successfully"
                     '''
                 }
             }
@@ -103,11 +114,16 @@ pipeline {
                     ).trim()
                 }
                 sh '''
+                # Update kubeconfig with correct role
                 aws eks update-kubeconfig \
                   --region $AWS_REGION \
                   --name $CLUSTER_NAME \
                   --role-arn arn:aws:iam::333982363626:role/jenkins-eks-role
+
+                # Verify connection works before deploying
+                echo "Verifying cluster connection..."
                 kubectl get nodes
+                kubectl get pods -A
                 '''
             }
         }
@@ -133,15 +149,15 @@ pipeline {
                 dir('terraform') {
                     sh '''
                     if [ -f "$STATE_FILE" ]; then
-                        echo "✅ Restoring state for destroy..."
+                        echo "Restoring state for destroy..."
                         cp $STATE_FILE terraform.tfstate
                     else
-                        echo "❌ No state file found, cannot destroy"
+                        echo "No state file found, cannot destroy"
                         exit 1
                     fi
                     terraform destroy -auto-approve
                     rm -f $STATE_FILE
-                    echo "✅ State cleaned up after destroy"
+                    echo "State cleaned up after destroy"
                     '''
                 }
             }
@@ -155,16 +171,16 @@ pipeline {
                 if [ -f "terraform.tfstate" ]; then
                     mkdir -p /var/lib/jenkins/terraform-states/eks
                     cp terraform.tfstate $STATE_FILE
-                    echo "✅ State backed up in post step"
+                    echo "State backed up in post step"
                 fi
                 '''
             }
         }
         success {
-            echo '✅ Pipeline executed successfully'
+            echo 'Pipeline executed successfully'
         }
         failure {
-            echo '❌ Pipeline failed - Check AWS credentials and IAM role permissions'
+            echo 'Pipeline failed - Check AWS credentials and IAM role permissions'
         }
     }
 }
