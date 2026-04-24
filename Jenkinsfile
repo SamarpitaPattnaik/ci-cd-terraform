@@ -19,7 +19,7 @@ pipeline {
                 dir('terraform') {
                     sh '''
                     # ✅ Restore state from Jenkins home if exists
-                    mkdir -p /var/jenkins_home/terraform-states/eks
+                    mkdir -p /var/lib/jenkins/terraform-states/eks
                     if [ -f "$STATE_FILE" ]; then
                         echo "✅ Restoring existing state file..."
                         cp $STATE_FILE terraform.tfstate
