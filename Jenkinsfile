@@ -1,11 +1,9 @@
 pipeline {
     agent any
-
     environment {
         AWS_REGION = 'ap-south-1'
         TF_IN_AUTOMATION = 'true'
     }
-
     parameters {
         booleanParam(
             name: 'DESTROY',
@@ -13,9 +11,7 @@ pipeline {
             description: 'Destroy infrastructure instead of creating'
         )
     }
-
     stages {
-
         stage('Clone Repo') {
             steps {
                 git branch: 'main', url: 'https://github.com/SamarpitaPattnaik/ci-cd-terraform.git'
@@ -33,7 +29,6 @@ pipeline {
             }
         }
 
-        // 🔥 APPLY ONLY IF NOT DESTROY
         stage('Terraform Apply') {
             when {
                 expression { return params.DESTROY == false }
@@ -45,7 +40,6 @@ pipeline {
             }
         }
 
-        // 🔥 UPDATE KUBECONFIG ONLY IF APPLY
         stage('Update kubeconfig') {
             when {
                 expression { return params.DESTROY == false }
@@ -57,16 +51,19 @@ pipeline {
                         returnStdout: true
                     ).trim()
                 }
-
                 sh '''
+                # ✅ Fixed: Added --role-arn so Jenkins assumes the correct IAM role
                 aws eks update-kubeconfig \
-                --region $AWS_REGION \
-                --name $CLUSTER_NAME
+                  --region $AWS_REGION \
+                  --name $CLUSTER_NAME \
+                  --role-arn arn:aws:iam::333982363626:role/jenkins-eks-role
+
+                # ✅ Added: Verify connection works before deploying
+                kubectl get nodes
                 '''
             }
         }
 
-        // 🔥 DEPLOY ONLY IF APPLY
         stage('Deploy to EKS') {
             when {
                 expression { return params.DESTROY == false }
@@ -75,11 +72,13 @@ pipeline {
                 sh '''
                 kubectl apply -f k8s/deployment.yaml
                 kubectl apply -f k8s/service.yaml
+
+                # ✅ Added: Verify deployment rollout
+                kubectl rollout status deployment -n default
                 '''
             }
         }
 
-        // 🔥 DESTROY ONLY IF SELECTED
         stage('Terraform Destroy') {
             when {
                 expression { return params.DESTROY == true }
@@ -97,7 +96,7 @@ pipeline {
             echo '✅ Pipeline executed successfully'
         }
         failure {
-            echo '❌ Pipeline failed'
+            echo '❌ Pipeline failed - Check AWS credentials and IAM role permissions'
         }
     }
 }
