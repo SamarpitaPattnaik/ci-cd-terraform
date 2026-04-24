@@ -114,16 +114,12 @@ pipeline {
                     ).trim()
                 }
                 sh '''
-                # Update kubeconfig with correct role
-                aws eks update-kubeconfig \
+                  aws eks update-kubeconfig \
                   --region $AWS_REGION \
-                  --name $CLUSTER_NAME \
-                  --role-arn arn:aws:iam::333982363626:role/jenkins-eks-role
+                  --name $CLUSTER_NAME
 
-                # Verify connection works before deploying
-                echo "Verifying cluster connection..."
+                 echo "Verifying cluster connection..."
                 kubectl get nodes
-                kubectl get pods -A
                 '''
             }
         }
