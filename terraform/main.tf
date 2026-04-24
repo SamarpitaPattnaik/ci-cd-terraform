@@ -4,7 +4,8 @@ module "eks" {
 
   cluster_name    = "terraform-eks-cluster"
   cluster_version = "1.30"
-
+  
+  create_cloudwatch_log_group = false
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
